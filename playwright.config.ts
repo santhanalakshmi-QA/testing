@@ -1,3 +1,6 @@
+// Load .env into process.env BEFORE anything below reads it. Playwright also
+// loads this config inside each worker, so BasePage/helper.js see the vars too.
+import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
 import os from 'node:os';
 
@@ -11,7 +14,19 @@ try {
   /* version is best-effort only */
 }
 
-const BASE_URL = process.env.STORE_URL ?? 'https://lollipop-theme.myshopify.com';
+// Single source of truth for the storefront under test. SHOPIFY_BASE_URL is what
+// BasePage.js / utils/helper.js read; STORE_URL is kept as a legacy fallback.
+// The trailing slash is stripped so `baseURL + '/path'` never yields `//path`.
+const BASE_URL = (process.env.SHOPIFY_BASE_URL ?? process.env.STORE_URL ?? 'https://lollipop-theme.myshopify.com')
+  .replace(/\/+$/, '');
+
+// When the storefront is password-protected and/or a specific theme is being
+// previewed, globalSetup writes the unlock cookies here and every test context
+// reuses them. Keep this path in sync with scripts/allure-global-setup.ts.
+const STORAGE_STATE = 'playwright/.auth/storefront.json';
+const NEEDS_UNLOCK = Boolean(
+  process.env.SHOPIFY_STOREFRONT_PASSWORD?.trim() || process.env.SHOPIFY_PREVIEW_THEME_ID?.trim(),
+);
 
 /**
  * Playwright configuration for the Lollipop Shopify theme home page suite.
@@ -96,7 +111,10 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.STORE_URL ?? 'https://lollipop-theme.myshopify.com',
+    baseURL: BASE_URL,
+    // Reuse the storefront-password / theme-preview cookies planted by
+    // globalSetup. Left undefined for open storefronts so nothing changes.
+    storageState: NEEDS_UNLOCK ? STORAGE_STATE : undefined,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',

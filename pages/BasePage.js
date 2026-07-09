@@ -12,7 +12,8 @@ export class BasePage {
   constructor(page) {
     this.page     = page;
     this.locators = LOCATORS;
-    this.baseURL  = process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com';
+    // Trailing slash stripped so `baseURL + '/path'` never yields `//path`.
+    this.baseURL  = (process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com').replace(/\/+$/, '');
   }
 
   // ── Navigation ──────────────────────────────────────────────

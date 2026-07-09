@@ -7,7 +7,8 @@
 import { expect } from '@playwright/test';
 import LOCATORS from '../locators/shopify-locators.js';
 
-const BASE_URL = process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com';
+// Trailing slash stripped so `BASE_URL + '/path'` never yields `//path`.
+const BASE_URL = (process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com').replace(/\/+$/, '');
 
 // ── URL constants ─────────────────────────────────────────────
 export const URLS = {
