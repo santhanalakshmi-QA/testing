@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sL \"https://lollipop-theme.myshopify.com/\" -o home2.html)"
+    ]
+  }
+}

@@ -35,5 +35,11 @@
       "storeName": "Lollipop-theme",
       "poweredByHref": "shopify.com"
     }
+  },
+  "announcementBar": {
+    "message": "Welcome to our store",
+    "trackCount": 2,
+    "blocksPerTrack": 5,
+    "animationName": "scroll-left"
   }
 }
