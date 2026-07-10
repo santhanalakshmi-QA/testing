@@ -1,19 +1,21 @@
 // pages/BasePage.js
 // ─────────────────────────────────────────────────────────────
 // Base class for all page objects.
-// Every page (HomePage, ProductPage, CartPage etc.)
+// Every page (AnnouncementBarPage, ProductPage, CartPage etc.)
 // extends this class and inherits these shared methods.
+//
+// This class is theme-agnostic on purpose: it holds navigation, waiting,
+// viewport, screenshot and console helpers, but owns NO selectors. Each
+// page object imports its own locator module. (The former `this.locators`
+// shortcut pointed at a shared Lollipop selector map that no longer exists.)
 // ─────────────────────────────────────────────────────────────
-
-import LOCATORS from '../locators/shopify-locators.js';
 
 export class BasePage {
 
   constructor(page) {
-    this.page     = page;
-    this.locators = LOCATORS;
+    this.page = page;
     // Trailing slash stripped so `baseURL + '/path'` never yields `//path`.
-    this.baseURL  = (process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com').replace(/\/+$/, '');
+    this.baseURL = (process.env.SHOPIFY_BASE_URL || 'https://wdtsanthanalakshmi.myshopify.com').replace(/\/+$/, '');
   }
 
   // ── Navigation ──────────────────────────────────────────────
@@ -152,30 +154,6 @@ export class BasePage {
       path: `screenshots/${name}.png`,
       fullPage: true,
     });
-  }
-
-  // ── Header actions ──────────────────────────────────────────
-
-  // Click the cart icon in header
-  async clickCartIcon() {
-    await this.click(this.locators.header.cartIcon);
-  }
-
-  // Click search icon in header
-  async clickSearchIcon() {
-    await this.click(this.locators.header.searchIcon);
-  }
-
-  // Click hamburger menu (mobile)
-  async clickMobileMenu() {
-    await this.click(this.locators.header.menuButton);
-    await this.page.waitForTimeout(400);
-  }
-
-  // Click logo to go home
-  async clickLogo() {
-    await this.click(this.locators.header.logo);
-    await this.waitForPageLoad();
   }
 
   // ── Console error checker ───────────────────────────────────

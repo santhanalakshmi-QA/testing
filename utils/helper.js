@@ -2,13 +2,18 @@
 // ─────────────────────────────────────────────────────────────
 // Shared helper functions used across all test files.
 // Import what you need in any test file like this:
-//   import { addToCart, collectErrors } from '../utils/Helper.js';
+//   import { BREAKPOINTS, collectErrors } from '../utils/helper.js';
+//
+// Everything here is theme-agnostic. The selector-coupled helpers that used
+// to live in this file (addToCart, searchFor, fillContactForm, openMobileMenu,
+// sectionsOfType, sectionWrappers) were bound to the Lollipop theme's shared
+// selector map and were removed with it. Re-add them per-theme in a page
+// object rather than here, so selectors never leak into the utility layer.
 // ─────────────────────────────────────────────────────────────
 import { expect } from '@playwright/test';
-import LOCATORS from '../locators/shopify-locators.js';
 
 // Trailing slash stripped so `BASE_URL + '/path'` never yields `//path`.
-const BASE_URL = (process.env.SHOPIFY_BASE_URL || 'https://lollipop-theme.myshopify.com').replace(/\/+$/, '');
+const BASE_URL = (process.env.SHOPIFY_BASE_URL || 'https://wdtsanthanalakshmi.myshopify.com').replace(/\/+$/, '');
 
 // ── URL constants ─────────────────────────────────────────────
 export const URLS = {
@@ -36,25 +41,6 @@ export const BREAKPOINTS = [
 // ── Navigate to a path and wait ───────────────────────────────
 export async function gotoPage(page, path, waitUntil = 'domcontentloaded') {
   await page.goto(BASE_URL + path, { waitUntil });
-}
-
-// ── Add first available product to cart ───────────────────────
-// Used in cart and checkout tests
-export async function addToCart(page) {
-  await gotoPage(page, URLS.collections);
-
-  // Click first product card
-  await page.locator(LOCATORS.collection.productLink).first().click();
-  await page.waitForLoadState('load');
-
-  // Click Add to Cart button
-  const atcBtn = page.locator(LOCATORS.product.atcButton).first();
-  await atcBtn.waitFor({ state: 'visible', timeout: 8000 });
-  await atcBtn.click();
-
-  // Wait for cart drawer or notification to appear
-  await page.locator(LOCATORS.cart.drawer).first()
-    .waitFor({ state: 'visible', timeout: 8000 });
 }
 
 // ── Collect JS console errors ─────────────────────────────────
@@ -117,31 +103,6 @@ export async function scrollDown(page, pixels = 600) {
   await page.waitForTimeout(300);
 }
 
-// ── Fill contact form fields ──────────────────────────────────
-export async function fillContactForm(page, { name, email, message }) {
-  await page.locator(LOCATORS.contact.nameInput).first().fill(name);
-  await page.locator(LOCATORS.contact.emailInput).first().fill(email);
-  await page.locator(LOCATORS.contact.msgInput).first().fill(message);
-}
-
-// ── Open search and type a query ──────────────────────────────
-export async function searchFor(page, query) {
-  await page.locator(LOCATORS.header.searchIcon).first().click();
-  const input = page.locator(LOCATORS.search.input).first();
-  await input.waitFor({ state: 'visible', timeout: 5000 });
-  await input.fill(query);
-  await page.waitForTimeout(600); // wait for debounce
-}
-
-// ── Open mobile menu ──────────────────────────────────────────
-export async function openMobileMenu(page) {
-  await setViewport(page, 375, 812);
-  await page.locator(LOCATORS.header.menuButton).first().click();
-  await page.waitForTimeout(400);
-  await page.locator(LOCATORS.nav.mobileMenu).first()
-    .waitFor({ state: 'visible', timeout: 5000 });
-}
-
 // ── Get all internal links on current page ────────────────────
 export async function getInternalLinks(page) {
   const hrefs = await page.evaluate(() =>
@@ -166,14 +127,6 @@ export async function gotoHome(page) {
   await page.waitForLoadState('networkidle').catch(() => {});
 }
 
-export function sectionsOfType(page, key) {
-  return page.locator(LOCATORS[key].section);
-}
-
-export function sectionWrappers(page) {
-  return page.locator(LOCATORS.home.sectionWrapper);
-}
-
 export async function expectAtLeast(locator, min, label) {
   const count = await locator.count();
   expect(count, `Expected ≥${min} "${label}", found ${count}`).toBeGreaterThanOrEqual(min);
@@ -190,8 +143,9 @@ export async function expectImageLoaded(img) {
 export default {
   URLS,
   BREAKPOINTS,
+  VIEWPORTS,
   gotoPage,
-  addToCart,
+  gotoHome,
   collectErrors,
   collectFailedRequests,
   setViewport,
@@ -199,8 +153,7 @@ export default {
   isVisible,
   waitFor,
   scrollDown,
-  fillContactForm,
-  searchFor,
-  openMobileMenu,
   getInternalLinks,
+  expectAtLeast,
+  expectImageLoaded,
 };

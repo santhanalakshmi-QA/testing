@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -sL \"https://lollipop-theme.myshopify.com/\" -o home2.html)"
+      "mcp__claude_ai_Shopify__graphql_schema"
     ]
   }
 }

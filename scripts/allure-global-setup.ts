@@ -106,7 +106,7 @@ async function unlockStorefront(baseURL: string): Promise<void> {
 export default async function globalSetup(): Promise<void> {
   cleanAllureResults();
 
-  const baseURL = (process.env.SHOPIFY_BASE_URL ?? process.env.STORE_URL ?? 'https://lollipop-theme.myshopify.com')
+  const baseURL = (process.env.SHOPIFY_BASE_URL ?? process.env.STORE_URL ?? 'https://wdtsanthanalakshmi.myshopify.com')
     .replace(/\/+$/, '');
   await unlockStorefront(baseURL);
 }

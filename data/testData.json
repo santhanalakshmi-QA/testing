@@ -1,100 +1,52 @@
 {
-  "homepage": {},
-  "header": {
-    "logoAlt": "Lollipop-theme",
-    "topLevelNav": [
-      { "label": "Home",        "href": "/" },
-      { "label": "Shop",        "href": "/collections", "hasMegaMenu": true },
-      { "label": "Inner Pages", "href": "/pages/our-story" },
-      { "label": "Journal",     "href": "/blogs/news" }
-    ],
-    "megaMenuTrigger": "Shop",
-    "search": {
-      "validTerm": "serum",
-      "noResultsTerm": "zzqwxytestnoresult123"
-    }
-  },
-  "footer": {
-    "logoAlt": "Lollipop-theme",
-    "menu": {
-      "heading": "Pages",
-      "links": [
-        { "label": "Shop",      "href": "/collections/all" },
-        { "label": "Our Story", "href": "/pages/our-story" },
-        { "label": "Journal",   "href": "/blogs/news" },
-        { "label": "Faq",       "href": "/pages/faq" },
-        { "label": "Contact",   "href": "/pages/contact" }
-      ]
-    },
-    "social": {
-      "heading": "Share with us",
-      "networks": ["Instagram", "Facebook", "TikTok", "Twitter", "Pinterest", "Tumblr", "Vimeo"]
-    },
-    "payments": ["Visa", "Mastercard", "American Express", "PayPal", "Diners Club", "Discover"],
-    "copyright": {
-      "storeName": "Lollipop-theme",
-      "poweredByHref": "shopify.com"
-    }
-  },
   "announcementBar": {
-    "message": "Welcome to our store",
-    "trackCount": 2,
-    "blocksPerTrack": 5,
-    "animationName": "scroll-left"
+    "displayType": "marquee",
+    "messages": [
+      "Free shipping on orders over $50",
+      "30-day easy returns",
+      "New arrivals every week"
+    ],
+    "itemCount": 3,
+    "linkedMessage": "30-day easy returns",
+    "linkHref": "/collections/all",
+    "linkCount": 1,
+    "animationName": "announcement-bar-marquee",
+    "animationDuration": "30s",
+    "animationDirection": "normal",
+    "colorSchemeClass": "color-scheme-1",
+    "textTransform": "uppercase",
+    "showsBottomDivider": true,
+    "pauseOnHover": true,
+    "marqueeGroupCount": 1,
+    "showsSocialIcons": false,
+    "showsLocalization": false,
+    "enableEdgeFade": false,
+    "hideOnMobile": false
   },
-  "featuredCollection": {
-    "heading": "Featured Collection",
-    "headingLevel": "h2",
-    "productsToShow": 7,
-    "autoplay": false,
-    "loop": true,
-    "spaceBetween": 55,
-    "cardAspectRatioClass": "ratio-1x1",
-    "hasArrows": false,
-    "hasDots": false,
-    "hasTabs": false,
-    "usesPlaceholderCards": true,
-    "placeholder": {
-      "title": "Product title",
-      "price": "€0,00"
-    },
-    "sliderOptions": {
-      "desktop": "4",
-      "laptop": "3",
-      "tablet": "3",
-      "medium_down": "2",
-      "mobile": "1",
-      "loop": "true",
-      "mode": "false",
-      "auto_play": "0",
-      "space": "55"
-    },
-    "breakpoints": {
-      "320": { "slidesPerView": 1, "spaceBetween": 27.5 },
-      "480": { "slidesPerView": 2, "spaceBetween": 38.5 },
-      "768": { "slidesPerView": 3, "spaceBetween": 38.5 },
-      "992": { "slidesPerView": 3, "spaceBetween": 44 },
-      "1400": { "slidesPerView": 4 }
-    },
-    "slidesPerViewByWidth": {
-      "375": 1,
-      "430": 1,
-      "479": 1,
-      "480": 2,
-      "768": 3,
-      "1024": 3,
-      "1440": 4,
-      "1920": 4
-    }
-  },
-  "slideshow": {
-    "slideCount": 3,
-    "ctaLabel": "View Collection",
-    "autoplay": false,
-    "slides": [
-      { "heading": "Because flawless is always in style", "href": "/collections/cleansers" },
-      { "heading": "Take a look into House of thrifts",    "href": "/collections/lip-cosmetics" },
-      { "heading": "Because elegance is always on trend.", "href": "/collections/face-masks" }
-    ]
+  "imageWithText": {
+    "path": "/",
+    "notRenderedOn": "/collections/all",
+    "heading": "Crafted for everyday wear",
+    "headingLevel": 2,
+    "description": "Pair text with an image to focus on your chosen product, collection, or promotion.",
+    "bullets": ["Free shipping over $50", "30-day easy returns"],
+    "bulletCount": 2,
+    "buttonLabel": "Shop now",
+    "buttonHref": "/collections/all",
+    "colorSchemeClass": "color-scheme-1",
+    "imagePosition": "left",
+    "verticalAlignment": "center",
+    "contentAlignment": "left",
+    "mobileImagePosition": "top",
+    "imageWidthVar": "50%",
+    "gapVar": "32px",
+    "gapPx": "32px",
+    "aspectRatioClass": "ratio-4x3",
+    "imageCount": 2,
+    "iconSizePx": "20px",
+    "hasOverlay": false,
+    "hasPlaceholder": false,
+    "rowLayoutMinWidth": 992,
+    "desktopImageMinWidth": 768
   }
 }

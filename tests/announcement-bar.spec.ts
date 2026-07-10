@@ -1,33 +1,35 @@
 // tests/announcement-bar.spec.ts
 // ─────────────────────────────────────────────────────────────
-// Announcement Bar test suite for the Lollipop Shopify theme
-// (https://lollipop-theme.myshopify.com/).
+// Announcement Bar test suite for the CURRENT published Shopify theme
+// "theme-export-wdt-atles-myshopify-com-kajalsele" (a Selena / SHThemes
+// build) on wdtsanthanalakshmi.myshopify.com.
 //
-// Coverage was derived by inspecting the LIVE storefront DOM/CSS (Shopify
-// MCP server + storefront HTML) rather than from assumptions. Verified:
-//   • Section sits ABOVE the header (shopify header-group), full width.
-//     Dynamic id (…__announcement_bar_NM8agT) → scoped via
-//     `.announcement-bar-section`, never hard-coded.
-//   • Horizontal CSS marquee: `.marquee_annoucement`
-//       animation: scroll-left 60s linear infinite; pauses on :hover.
-//   • Two identical tracks; the 2nd carries `inert` (seamless loop +
-//     removed from the a11y tree). 5 `[data-block-type="announcement"]`
-//     blocks per track, each reading "Welcome to our store".
-//   • No dismiss control (persistent bar); not in vertical/swiper mode.
+// Coverage was derived by inspecting the theme source through the Shopify
+// MCP server AND dumping the live rendered storefront DOM/CSS. Verified:
+//   • The section lives in `header-group`, so it renders above the
+//     <site-header> on every template and survives navigation. Dynamic id
+//     (#shopify-section-sections--…__announcement_bar) → never hard-coded;
+//     scoped via `.announcement-bar` / `.shopify-section--announcement-bar`.
+//   • Marquee mode (`data-type="marquee"`): `.announcement-bar__marquee-track`
+//       animation: announcement-bar-marquee 30s linear infinite normal;
+//     pauses on hover, gated by `[data-pause-hover="true"]`.
+//   • Exactly ONE `.announcement-bar__marquee-group` holding 3
+//     `.announcement-bar-item` blocks. Item 2 carries a link to
+//     /collections/all; the other two are plain text.
+//   • Carousel (Swiper) mode, social icons, localization slot, edge fade and
+//     any dismiss control are all absent in this config.
 //
 // Architecture: intent lives in pages/AnnouncementBarPage.ts (extends
 // BasePage); selectors live in locators/announcement-bar.locators.ts;
 // shared utilities come from utils/helper.js; expected values come from
-// data/testData.json. The existing HeaderPage is reused for the
-// "above the header" ordering check. No locators are written inline here.
+// data/testData.json. No locators are written inline here.
 //
-// NOTES / non-automatable items are documented at the bottom of file.
+// NOTES / theme defects / non-automatable items are at the bottom of the file.
 // ─────────────────────────────────────────────────────────────
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { AnnouncementBarPage } from '../pages/AnnouncementBarPage';
-import { HeaderPage } from '../pages/HeaderPage.js';
 import { BREAKPOINTS, collectErrors } from '../utils/helper.js';
 import testData from '../data/testData.json';
 
@@ -49,24 +51,29 @@ test.describe('Announcement Bar - Structure & Presence', () => {
     await expect(ab.section).toBeVisible();
   });
 
-  test('announcement bar is laid out inside a container', async () => {
-    await expect(ab.container).toBeVisible();
-    await expect(ab.bar).toBeVisible();
+  test('announcement bar is wrapped in its own Shopify section', async () => {
+    await expect(ab.sectionWrapper).toBeVisible();
+    await expect(ab.inner).toBeVisible();
+    await expect(ab.content).toBeVisible();
   });
 
-  test('announcement bar is positioned above the site header', async ({ page }) => {
-    const header = new HeaderPage(page);
+  test('announcement bar is positioned above the site header', async () => {
     const barBox = await ab.section.boundingBox();
-    const headerBox = await header.header().boundingBox();
+    const headerBox = await ab.siteHeader.boundingBox();
     expect(barBox, 'announcement bar should have a layout box').not.toBeNull();
-    expect(headerBox, 'header should have a layout box').not.toBeNull();
+    expect(headerBox, 'site header should have a layout box').not.toBeNull();
     // The bar's top edge must sit above the header's top edge.
     expect(barBox!.y).toBeLessThan(headerBox!.y);
   });
 
-  test('announcement bar applies a theme color scheme', async () => {
-    // UI styling contract: the section carries a color-scheme + gradient class.
-    await expect(ab.section).toHaveClass(/color-scheme-\d/);
+  test('announcement bar applies the configured theme color scheme', async () => {
+    await expect(ab.section).toHaveClass(new RegExp(AB.colorSchemeClass));
+  });
+
+  test('announcement bar renders the configured bottom divider', async () => {
+    // `show_bottom_divider: true` in the section settings adds this modifier.
+    expect(AB.showsBottomDivider).toBe(true);
+    await expect(ab.section).toHaveClass(/announcement-bar--divider/);
   });
 });
 
@@ -82,33 +89,48 @@ test.describe('Announcement Bar - Content & Validation', () => {
     await ab.open();
   });
 
-  test('active track renders at least one announcement message', async () => {
-    expect(await ab.activeMessages().count()).toBeGreaterThan(0);
-    await expect(ab.activeMessages().first()).toBeVisible();
+  test('bar renders at least one announcement item', async () => {
+    expect(await ab.items.count()).toBeGreaterThan(0);
+    await expect(ab.items.first()).toBeVisible();
   });
 
-  test('every announcement message exposes non-empty text', async () => {
-    const texts = await ab.activeMessageTexts();
+  test('bar renders the expected number of announcement items', async () => {
+    await expect(ab.items).toHaveCount(AB.itemCount);
+  });
+
+  test('every announcement item exposes non-empty text', async () => {
+    const texts = await ab.messages();
     expect(texts.length).toBeGreaterThan(0);
     for (const [i, t] of texts.entries()) {
-      expect(t, `message #${i} should not be empty`).not.toEqual('');
+      expect(t, `item #${i} should not be empty`).not.toEqual('');
     }
   });
 
-  test('announcement message content matches the configured text', async () => {
-    const texts = await ab.activeMessageTexts();
-    for (const t of texts) {
-      expect(t).toBe(AB.message);
-    }
+  test('announcement item content matches the configured text, in order', async () => {
+    // messages() reads textContent, so the CSS `text-transform: uppercase`
+    // does not leak in — these are the strings authored in theme settings.
+    expect(await ab.messages()).toEqual(AB.messages);
   });
 
-  test('active track renders the expected number of announcement blocks', async () => {
-    // Config-driven validation (current live config = blocksPerTrack).
-    await expect(ab.activeBlocks()).toHaveCount(AB.blocksPerTrack);
+  test('the linked announcement item points at its configured destination', async () => {
+    await expect(ab.itemLinks).toHaveCount(AB.linkCount);
+    expect(await ab.linkHrefs()).toEqual([AB.linkHref]);
+    await expect(ab.itemLinks.first()).toHaveText(AB.linkedMessage);
   });
 
-  test('the bar renders exactly the expected number of marquee tracks', async () => {
-    await expect(ab.tracks).toHaveCount(AB.trackCount);
+  test('the linked announcement item navigates when clicked', async ({ page }) => {
+    // clickLinkedItem() hovers first: the marquee animates continuously, so the
+    // anchor is never "stable" for Playwright's actionability check until the
+    // theme's pause-on-hover kicks in. See NOTE 7.
+    await ab.clickLinkedItem();
+    await page.waitForURL(new RegExp(`${AB.linkHref}$`));
+    expect(new URL(page.url()).pathname).toBe(AB.linkHref);
+  });
+
+  test('unlinked announcement items are plain text, not anchors', async () => {
+    // Only one of the three items was given a link in theme settings.
+    expect(await ab.items.count()).toBe(AB.itemCount);
+    expect(await ab.itemLinks.count()).toBe(AB.linkCount);
   });
 });
 
@@ -124,7 +146,15 @@ test.describe('Announcement Bar - Marquee behaviour', () => {
     await ab.open();
   });
 
-  test('active track uses the scroll-left CSS marquee animation', async () => {
+  test('the section renders in marquee mode, not carousel mode', async () => {
+    expect(await ab.displayType()).toBe(AB.displayType);
+    await expect(ab.marquee).toBeVisible();
+    await expect(ab.swiper).toHaveCount(0);
+    await expect(ab.swiperSlides).toHaveCount(0);
+    await expect(ab.navButtons).toHaveCount(0);
+  });
+
+  test('marquee track uses the theme CSS marquee animation', async () => {
     expect(await ab.animationName()).toContain(AB.animationName);
   });
 
@@ -132,26 +162,33 @@ test.describe('Announcement Bar - Marquee behaviour', () => {
     expect(await ab.animationIterationCount()).toBe('infinite');
   });
 
+  test('marquee animation runs at the configured speed and direction', async () => {
+    // `speed: 30` → --announce-marquee-speed: 30s; `direction: left` → normal.
+    expect(await ab.animationDuration()).toBe(AB.animationDuration);
+    expect(await ab.animationDirection()).toBe(AB.animationDirection);
+  });
+
   test('marquee is running by default', async () => {
     expect(await ab.animationPlayState()).toBe('running');
   });
 
-  test('a duplicate track exists and is inert (seamless loop + a11y hidden)', async () => {
-    await expect(ab.duplicateTrack).toHaveCount(1);
-    await expect(ab.duplicateTrack).toHaveAttribute('inert', /.*/);
+  test('marquee content is clipped by its viewport, not scrollable', async () => {
+    expect(await ab.marqueeOverflow()).toBe('hidden');
   });
 
-  test('the duplicate track mirrors the announcement message for a seamless loop', async () => {
-    // The duplicate (inert) track is a JS-built fill track, so its block
-    // COUNT can differ from the server-rendered active track; the invariant
-    // that matters is that it repeats the same message text.
-    const dupMessages = (
-      await ab.duplicateTrack.locator('[data-block-type="announcement"] p').allInnerTexts()
-    ).map((t) => t.trim());
-    expect(dupMessages.length).toBeGreaterThan(0);
-    for (const t of dupMessages) {
-      expect(t).toBe(AB.message);
-    }
+  test('the theme renders a single marquee group (see NOTE 1 — theme defect)', async () => {
+    // Liquid emits ONE group. assets/marquee.js is supposed to clone it so the
+    // keyframes' translateX(-50%) yields a seamless loop, but the script never
+    // matches this section's class names, so no clones are ever appended.
+    // Asserting the real count pins the current behaviour; if the theme is
+    // fixed, this test fails loudly and testData.marqueeGroupCount is updated.
+    await expect(ab.groups).toHaveCount(AB.marqueeGroupCount);
+  });
+
+  test("the theme's marquee.js finds no hooks inside the announcement bar (NOTE 1)", async () => {
+    // marquee.js queries .marquee-content / .marquee-track / .marquee-group;
+    // this section emits .announcement-bar__marquee{,-track,-group}.
+    await expect(ab.jsMarqueeHooks).toHaveCount(0);
   });
 });
 
@@ -167,18 +204,21 @@ test.describe('Announcement Bar - Hover interaction', () => {
     await ab.open();
   });
 
+  test('pause-on-hover is enabled in the theme settings', async () => {
+    expect(await ab.pauseOnHoverEnabled()).toBe(AB.pauseOnHover);
+  });
+
   test('hovering the marquee pauses the animation and leaving resumes it', async () => {
     test.skip(!(await ab.supportsHover()), 'pointer has no hover (touch device)');
 
     expect(await ab.animationPlayState()).toBe('running');
 
-    await ab.hoverBar();
+    await ab.hoverMarquee();
     await expect
       .poll(() => ab.animationPlayState(), { message: 'hover should pause the marquee' })
       .toBe('paused');
 
-    // Move the pointer away and confirm the marquee resumes.
-    await ab.section.page().mouse.move(0, 0);
+    await ab.unhoverMarquee();
     await expect
       .poll(() => ab.animationPlayState(), { message: 'leaving should resume the marquee' })
       .toBe('running');
@@ -197,20 +237,31 @@ test.describe('Announcement Bar - UI & Layout', () => {
     await ab.open();
   });
 
-  test('marquee text does not wrap (single-line ticker)', async () => {
-    expect(await ab.viewportWhiteSpace()).toBe('nowrap');
+  test('announcement text does not wrap (single-line ticker)', async () => {
+    expect(await ab.itemWhiteSpace()).toBe('nowrap');
   });
 
-  test('overflowing marquee content is clipped, not scrollable', async () => {
-    expect(await ab.viewportOverflowX()).toBe('hidden');
+  test('announcement text renders in the configured letter case', async () => {
+    // `text_transform: uppercase` on every announcement-item block.
+    expect(await ab.itemTextTransform()).toBe(AB.textTransform);
   });
 
-  test('the announcement bar does not exceed the viewport width', async ({ page }) => {
+  test('the announcement bar spans the full viewport width without overflowing', async ({ page }) => {
     const box = await ab.section.boundingBox();
     const innerWidth = await page.evaluate(() => window.innerWidth);
     expect(box).not.toBeNull();
-    // Allow 1px sub-pixel rounding tolerance.
+    // `width_type: full_width` — allow 1px sub-pixel rounding tolerance.
     expect(box!.width).toBeLessThanOrEqual(innerWidth + 1);
+    expect(box!.width).toBeGreaterThanOrEqual(innerWidth - 1);
+  });
+
+  test('optional slots disabled in theme settings are not rendered', async () => {
+    expect(AB.showsSocialIcons).toBe(false);
+    expect(AB.showsLocalization).toBe(false);
+    expect(AB.enableEdgeFade).toBe(false);
+    await expect(ab.social).toHaveCount(0);
+    await expect(ab.localization).toHaveCount(0);
+    await expect(ab.edgeFade).toHaveCount(0);
   });
 });
 
@@ -221,18 +272,19 @@ test.describe('Announcement Bar - Responsive', () => {
   for (const bp of BREAKPOINTS) {
     test(`bar stays visible above the header and animates at ${bp.name} (${bp.width}px)`, async ({ page }) => {
       const ab = new AnnouncementBarPage(page);
-      const header = new HeaderPage(page);
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await ab.open();
 
+      // `hide_on_mobile: false` — the bar is shown at every width.
+      expect(AB.hideOnMobile).toBe(false);
       await expect(ab.section).toBeVisible();
-      expect(await ab.activeMessages().count()).toBeGreaterThan(0);
+      await expect(ab.items).toHaveCount(AB.itemCount);
 
       const barBox = await ab.section.boundingBox();
-      const headerBox = await header.header().boundingBox();
+      const headerBox = await ab.siteHeader.boundingBox();
       expect(barBox!.y).toBeLessThan(headerBox!.y);
 
-      // Marquee animation is offered at every width.
+      // The marquee animation is offered at every width.
       expect(await ab.animationName()).toContain(AB.animationName);
     });
   }
@@ -252,7 +304,7 @@ test.describe('Announcement Bar - Accessibility', () => {
 
   test('announcement bar has no critical or serious axe violations', async ({ page }) => {
     const results = await new AxeBuilder({ page })
-      .include('.announcement-bar-section')
+      .include('.announcement-bar')
       .analyze();
 
     const blocking = results.violations.filter(
@@ -267,18 +319,18 @@ test.describe('Announcement Bar - Accessibility', () => {
     ).toEqual([]);
   });
 
-  test('the duplicate marquee track is removed from the accessibility tree (inert)', async () => {
-    await expect(ab.duplicateTrack).toHaveAttribute('inert', /.*/);
+  test('the linked announcement item is reachable as a link', async () => {
+    await expect(ab.itemLinks.first()).toHaveAttribute('href', AB.linkHref);
   });
 
   test('announcement text remains perceivable when reduced motion is preferred', async ({ page }) => {
     // The bar is a decorative auto-scroller; under reduced-motion the message
-    // text must still be present and readable. (See NOTE 3 about the theme's
-    // marquee not disabling the animation itself under reduced motion.)
+    // text must still be present and readable. (See NOTE 2 — the theme does
+    // NOT stop the animation itself under reduced motion.)
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await ab.open();
-    await expect(ab.activeMessages().first()).toBeVisible();
-    expect((await ab.activeMessageTexts())[0]).toBe(AB.message);
+    await expect(ab.items.first()).toBeVisible();
+    expect(await ab.messages()).toEqual(AB.messages);
   });
 });
 
@@ -298,15 +350,18 @@ test.describe('Announcement Bar - Edge cases', () => {
     await expect(ab.closeButton).toHaveCount(0);
   });
 
-  test('the bar renders in horizontal marquee mode, not vertical/swiper mode', async () => {
-    await expect(ab.horizontal).toBeVisible();
-    await expect(ab.swiper).toHaveCount(0);
+  test('exactly one announcement bar is rendered per page', async () => {
+    // The theme also ships a standalone `marquee` section; it must not be
+    // mistaken for, or duplicate, the announcement bar.
+    await expect(ab.allSections).toHaveCount(1);
   });
 
   test('the announcement bar persists across navigation (header-group section)', async () => {
-    await ab.open('/collections/all');
-    await expect(ab.section).toBeVisible();
-    expect((await ab.activeMessageTexts())[0]).toBe(AB.message);
+    for (const path of ['/collections/all', '/cart']) {
+      await ab.open(path);
+      await expect(ab.section).toBeVisible();
+      expect(await ab.messages()).toEqual(AB.messages);
+    }
   });
 });
 
@@ -339,22 +394,53 @@ test.describe('Announcement Bar - Stability', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// NOTES — requirements that are intentionally NOT automated here
+// NOTES — theme defects & requirements intentionally NOT automated
 // ─────────────────────────────────────────────────────────────
-// 1. Announcement destinations / CTAs: in this store config the blocks are
-//    plain text ("Welcome to our store") with no links, so outbound
-//    navigation cannot be asserted. If links are added in theme settings,
-//    extend the Content suite with href/navigation checks.
-// 2. Vertical (swiper) announcement style: the theme also ships a vertical
-//    slideshow variant, but this store runs the horizontal marquee. The
-//    swiper path is covered only negatively (Edge cases) until a store
-//    enables it.
-// 3. prefers-reduced-motion: the theme's marquee CSS has no reduced-motion
-//    media query, so the animation itself does not stop under
-//    reduced-motion. Rather than assert a theme limitation as a failure,
-//    the a11y suite verifies the message stays perceivable; disabling the
-//    animation for reduced-motion is a recommended theme improvement.
-// 4. Marquee pixel travel: asserting the strip actually translates over
-//    time is timing/CI-flaky, so behaviour is validated via the computed
-//    animation contract (name/iteration/play-state) and the deterministic
-//    pause-on-hover interaction instead.
+// 1. THEME DEFECT — the marquee never loops seamlessly.
+//    `sections/announcement-bar.liquid` renders exactly one
+//    `.announcement-bar__marquee-group`, while the keyframes
+//    `announcement-bar-marquee` animate the track by translateX(-50%) — a
+//    seamless loop only when the track holds TWO copies of the content.
+//    `assets/marquee.js` does build clones, but it queries `.marquee-content`,
+//    `.marquee-track` and `.marquee-group`, whereas this section emits
+//    `.announcement-bar__marquee`, `-track` and `-group`. The class names never
+//    match, so the clone-builder never touches the announcement bar and the
+//    strip visibly snaps back mid-scroll. Two tests pin this (group count = 1,
+//    JS hooks = 0) so a future theme fix fails loudly rather than silently.
+//    Recommended theme fix: align the class names or extend SECTION_CLASSES.
+// 2. THEME DEFECT — prefers-reduced-motion is not honoured.
+//    marquee.js short-circuits on reduced motion, but (per NOTE 1) it never
+//    runs here, and the section's own CSS has no reduced-motion media query.
+//    The animation therefore keeps running. Rather than assert a theme
+//    limitation as a pass, the a11y suite verifies the message text stays
+//    perceivable; stopping the animation is a recommended theme improvement.
+// 3. THE PUBLISHED THEME RENDERS NO ANNOUNCEMENT BAR.
+//    The store publishes "theme-export-wdt-atles-myshopify-com-kajalsele".
+//    Its `sections/announcement-bar.liquid` ships with the theme but is NOT
+//    placed in any section group or template, so no announcement bar renders
+//    on the live storefront at all. These tests run against an unpublished
+//    duplicate ("QA - Announcement Bar (Playwright)", id 188167946607) that
+//    adds the section to `sections/header-group.json` in marquee mode.
+//    `SHOPIFY_PREVIEW_THEME_ID` in .env selects it; globalSetup plants
+//    Shopify's preview cookie. Clear that var to test the published theme,
+//    at which point every test here will fail on a missing bar — by design.
+// 4. The "above the header" check resolves `<site-header>` from this suite's
+//    own locator module. There is no HeaderPage for this theme yet; when one is
+//    written, move the `siteHeader` selector into its own header locator file.
+// 5. Carousel (Swiper) mode: the section supports `type: carousel` with
+//    autoplay, loop, pause-on-hover and prev/next arrows. This store runs
+//    marquee mode, so the carousel path is covered only negatively. If the
+//    setting is switched, extend the Marquee suite with slide/arrow coverage.
+// 6. Marquee pixel travel: asserting the strip actually translates over time is
+//    timing/CI-flaky, so behaviour is validated via the computed animation
+//    contract (name/duration/direction/iteration/play-state) and the
+//    deterministic pause-on-hover interaction instead.
+// 7. USABILITY — links inside the marquee are hard to click.
+//    The strip never stops moving, so Playwright's actionability check reports
+//    "element is not stable" and a plain .click() on an announcement link times
+//    out. AnnouncementBarPage.clickLinkedItem() hovers first, letting the
+//    theme's pause-on-hover settle the anchor before clicking — which is
+//    exactly what a mouse user does. Touch pointers get no hover and therefore
+//    no pause, so the method falls back to a forced click to mimic tapping a
+//    moving target. That fallback documents a genuine mobile UX weakness of
+//    marquee-mode links, not a test shortcut.

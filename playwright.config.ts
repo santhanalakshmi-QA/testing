@@ -17,7 +17,7 @@ try {
 // Single source of truth for the storefront under test. SHOPIFY_BASE_URL is what
 // BasePage.js / utils/helper.js read; STORE_URL is kept as a legacy fallback.
 // The trailing slash is stripped so `baseURL + '/path'` never yields `//path`.
-const BASE_URL = (process.env.SHOPIFY_BASE_URL ?? process.env.STORE_URL ?? 'https://lollipop-theme.myshopify.com')
+const BASE_URL = (process.env.SHOPIFY_BASE_URL ?? process.env.STORE_URL ?? 'https://wdtsanthanalakshmi.myshopify.com')
   .replace(/\/+$/, '');
 
 // When the storefront is password-protected and/or a specific theme is being
@@ -29,8 +29,8 @@ const NEEDS_UNLOCK = Boolean(
 );
 
 /**
- * Playwright configuration for the Lollipop Shopify theme home page suite.
- * Base URL points at the theme preview store. Projects cover the responsive
+ * Playwright configuration for the Atles Shopify storefront suite.
+ * Base URL points at the store under test. Projects cover the responsive
  * breakpoints referenced by the responsive test cases (mobile / tablet / desktop).
  */
 export default defineConfig({
@@ -65,7 +65,7 @@ export default defineConfig({
         suiteTitle: true,
         // Shown on the report's "Environment" widget.
         environmentInfo: {
-          Project: 'Lollipop Shopify Home Tests',
+          Project: 'Atles Shopify Storefront Tests',
           Base_URL: BASE_URL,
           Playwright: pwVersion,
           Node: process.version,
@@ -80,7 +80,7 @@ export default defineConfig({
         // report's "Tags" filter). Per-test tags can still be added via
         // Playwright's `tag` option or `@tag` in a title.
         globalLabels: [
-          { name: 'epic', value: 'Lollipop Storefront' },
+          { name: 'epic', value: 'Atles Storefront' },
           { name: 'tag', value: 'storefront' },
           { name: 'tag', value: 'ui' },
         ],
