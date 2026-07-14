@@ -167,14 +167,19 @@ export class ImageWithTextPage extends BasePage {
     );
   }
 
-  /** Trimmed heading text. */
+  /**
+   * Trimmed heading text.
+   * Uses textContent, not innerText, so the theme's `text-transform`
+   * (the blocks default to `capitalize`) does not leak into the assertion —
+   * the value stays comparable to the string authored in theme settings.
+   */
   async headingText(level = 2): Promise<string> {
-    return (await this.heading(level).innerText()).trim();
+    return ((await this.heading(level).textContent()) ?? '').trim();
   }
 
-  /** Trimmed description text. */
+  /** Trimmed description text (textContent — see headingText for why). */
   async descriptionText(): Promise<string> {
-    return (await this.descriptionBlock.innerText()).trim();
+    return ((await this.descriptionBlock.textContent()) ?? '').trim();
   }
 
   /** Trimmed text of every bullet point, in DOM order. */

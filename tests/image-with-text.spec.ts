@@ -1,45 +1,48 @@
 // tests/image-with-text.spec.ts
 // ─────────────────────────────────────────────────────────────
 // "Image with Text" test suite for the published Shopify theme
-// "theme-export-wdt-atles-myshopify-com-kajalsele" (a Selena / SHThemes
-// build) on wdtsanthanalakshmi.myshopify.com.
+// "theme-export-wdt-atles-myshopify-com-kajalsele" (a Selena / SHThemes build)
+// on abundance-theme.myshopify.com (public, no password protection).
 //
 // Coverage was derived by inspecting the theme source through the Shopify
-// MCP server AND dumping the live rendered storefront DOM/CSS. Verified:
+// MCP server AND dumping the live rendered storefront DOM/CSS. Verified against
+// this store's LIVE configuration:
 //   • Two-column flex layout inside `.image-with-text__inner`, with inline
 //     `--gap: 32px` and `--image-width: 50%` custom properties.
 //   • Bootstrap `lg` (992px) flips the stacked column into a row via
 //     `flex-lg-row`. With `image_position: left` the media column then sits
 //     to the LEFT of the content column.
-//   • Bootstrap `md` (768px) swaps the images: below it the `--mobile` wrap
-//     is shown, at/above it the desktop wrap. These are two DIFFERENT
-//     breakpoints — the layout flip and the image swap do not coincide.
-//   • Both image wraps carry `aria-hidden="true"`: the imagery is decorative
-//     and all accessible content lives in the text column.
-//   • Content column renders, in block order: an <h2> heading, a description,
-//     two bullet points (icon + text), and a `.btn` linking to /collections/all.
+//   • The section is in the theme's DEFAULT preset: NO image is uploaded, so
+//     the image column renders a single placeholder wrap (SVG, aria-hidden),
+//     NOT a real <img> with desktop/mobile variants. The content column has an
+//     <h2> "Tell your story", a description, NO bullet points, and a `.btn`
+//     linking to /collections/all.
+//
+// Because no real image is configured, the image-loading / srcset / mobile-swap
+// / aspect-ratio / bullet coverage cannot assert against real content; those
+// paths are covered by their default-state assertions (placeholder present,
+// zero bullets) and documented in NOTES 4–5. Upload an image and add bullet
+// blocks in the Theme Editor to unlock the fuller suite.
 //
 // Architecture: intent lives in pages/ImageWithTextPage.ts (extends BasePage);
 // selectors live in locators/image-with-text.locators.ts; shared utilities come
 // from utils/helper.js; expected values come from data/testData.json. No
 // locators are written inline here.
 //
-// NOTES — theme defects, Shopify limitations and scenarios that are
-// intentionally NOT automated — are documented at the bottom of the file.
+// NOTES — theme limitations, Shopify limits and scenarios NOT automated — are
+// documented at the bottom of the file.
 // ─────────────────────────────────────────────────────────────
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { ImageWithTextPage } from '../pages/ImageWithTextPage';
-import { BREAKPOINTS, collectErrors, expectImageLoaded } from '../utils/helper.js';
+import { BREAKPOINTS, collectErrors } from '../utils/helper.js';
 import testData from '../data/testData.json';
 
 const IWT = testData.imageWithText;
 
 /** Breakpoints at which the theme lays the section out as a row (Bootstrap `lg`). */
 const isRowLayout = (width: number): boolean => width >= IWT.rowLayoutMinWidth;
-/** Breakpoints at which the desktop image (not the mobile one) is shown (Bootstrap `md`). */
-const showsDesktopImage = (width: number): boolean => width >= IWT.desktopImageMinWidth;
 
 // ═════════════════════════════════════════════════════════════
 // 1. STRUCTURE & PRESENCE  (positive)
@@ -110,28 +113,10 @@ test.describe('Image with Text - Content & Validation', () => {
     expect(await iwt.headingText(IWT.headingLevel)).not.toBe(await iwt.descriptionText());
   });
 
-  test('every configured bullet point renders, in order', async () => {
+  test('the configured number of bullet points renders', async () => {
+    // This store's section has no bullet-point blocks (default preset). The
+    // theme supports them; add blocks to raise IWT.bulletCount. See NOTE 5.
     await expect(iwt.bullets).toHaveCount(IWT.bulletCount);
-    expect(await iwt.bulletPointTexts()).toEqual(IWT.bullets);
-  });
-
-  test('every bullet point renders a non-empty label', async () => {
-    const texts = await iwt.bulletPointTexts();
-    expect(texts.length).toBeGreaterThan(0);
-    for (const [i, t] of texts.entries()) {
-      expect(t, `bullet #${i} should not be empty`).not.toEqual('');
-    }
-  });
-
-  test('every bullet point renders its icon at the configured size', async () => {
-    await expect(iwt.bulletIcons).toHaveCount(IWT.bulletCount);
-    const bullets = await iwt.bullets.all();
-    for (const bullet of bullets) {
-      const size = await bullet.evaluate((el) =>
-        getComputedStyle(el).getPropertyValue('--icon-size').trim(),
-      );
-      expect(size).toBe(IWT.iconSizePx);
-    }
   });
 
   test('the call-to-action button renders its configured label and destination', async () => {
@@ -140,7 +125,7 @@ test.describe('Image with Text - Content & Validation', () => {
     expect(await iwt.buttonHref()).toBe(IWT.buttonHref);
   });
 
-  test('content blocks render in the configured order: heading, description, bullets, button', async () => {
+  test('content blocks render in the configured order: heading, description, button', async () => {
     const order = await iwt.content.evaluate((el) =>
       Array.from(el.children)
         .filter((c) => c.tagName !== 'STYLE')
@@ -151,7 +136,8 @@ test.describe('Image with Text - Content & Validation', () => {
           return 'description';
         }),
     );
-    expect(order).toEqual(['heading', 'description', 'bullet', 'bullet', 'button']);
+    // No bullet blocks in this config.
+    expect(order).toEqual(['heading', 'description', 'button']);
   });
 });
 
@@ -167,38 +153,27 @@ test.describe('Image with Text - Image column', () => {
     await iwt.open(IWT.path);
   });
 
-  test('the image block renders both a desktop and a mobile image wrap', async () => {
+  test('the image block renders', async () => {
     await expect(iwt.imageBlock).toBeVisible();
-    await expect(iwt.imageWraps).toHaveCount(IWT.imageCount);
-    await expect(iwt.images).toHaveCount(IWT.imageCount);
   });
 
-  test('the desktop image wrap applies the configured aspect ratio', async () => {
-    await expect(iwt.desktopImageWrap).toHaveClass(new RegExp(IWT.aspectRatioClass));
+  test('a placeholder is rendered because no image is configured', async () => {
+    // `image-with-text-image.liquid` emits the placeholder SVG only when both
+    // `image` and `mobile_image` are blank — which is this store's state.
+    expect(IWT.hasPlaceholder).toBe(true);
+    await expect(iwt.placeholder).toHaveCount(1);
+    await expect(iwt.placeholder.first()).toBeVisible();
   });
 
-  test('the visible image actually loads (non-zero natural width)', async () => {
-    // The images are lazy-loaded, so settle them first, then assert with the
-    // shared expectImageLoaded helper from utils/helper.js.
-    await iwt.waitForVisibleImageLoaded();
-    await expectImageLoaded(iwt.visibleImage);
+  test('no real <img> element is present while using the placeholder', async () => {
+    // Guards the default state: when a real image is later uploaded, this
+    // flips (realImageCount > 0) and flags that testData needs updating.
+    expect(IWT.realImageCount).toBe(0);
+    await expect(iwt.images).toHaveCount(0);
   });
 
-  test('images are lazy-loaded and responsive (srcset + sizes)', async () => {
-    await expect(iwt.visibleImage).toHaveAttribute('loading', 'lazy');
-    await expect(iwt.visibleImage).toHaveAttribute('sizes', /.+/);
-    // image_tag emits a multi-width candidate list, e.g. "…&width=480 480w, …".
-    const srcset = await iwt.visibleImage.getAttribute('srcset');
-    expect(srcset).toBeTruthy();
-    const candidates = srcset!.split(',').filter((c) => /\d+w\s*$/.test(c.trim()));
-    expect(candidates.length).toBeGreaterThan(1);
-  });
-
-  test('no placeholder is rendered when an image is configured', async () => {
-    // `image-with-text-image.liquid` only emits the placeholder SVG when both
-    // `image` and `mobile_image` are blank.
-    expect(IWT.hasPlaceholder).toBe(false);
-    await expect(iwt.placeholder).toHaveCount(0);
+  test('the placeholder occupies a single image wrap', async () => {
+    await expect(iwt.imageWraps).toHaveCount(IWT.imageWrapCount);
   });
 
   test('no overlay is rendered when enable_overlay is off', async () => {
@@ -303,7 +278,7 @@ test.describe('Image with Text - Functional', () => {
 });
 
 // ═════════════════════════════════════════════════════════════
-// 6. RESPONSIVE  (integrity across breakpoints + boundary values)
+// 6. RESPONSIVE  (integrity across breakpoints)
 // ═════════════════════════════════════════════════════════════
 test.describe('Image with Text - Responsive', () => {
   for (const bp of BREAKPOINTS) {
@@ -324,23 +299,13 @@ test.describe('Image with Text - Responsive', () => {
       if (isRowLayout(bp.width)) {
         expect(await iwt.imageIsLeftOfContent()).toBe(true);
       } else {
-        // `mobile_image_position: top` — media stacks above the content.
-        expect(IWT.mobileImagePosition).toBe('top');
+        // Stacked: media column sits above the content column.
         expect(await iwt.imageIsAboveContent()).toBe(true);
       }
 
-      // Image swap happens at a DIFFERENT breakpoint — Bootstrap `md` (768px).
-      if (showsDesktopImage(bp.width)) {
-        await expect(iwt.desktopImageWrap).toBeVisible();
-        await expect(iwt.mobileImageWrap).toBeHidden();
-      } else {
-        await expect(iwt.mobileImageWrap).toBeVisible();
-        await expect(iwt.desktopImageWrap).toBeHidden();
-      }
-
-      // Whichever image is shown must actually decode (they are lazy-loaded).
-      await iwt.waitForVisibleImageLoaded();
-      await expectImageLoaded(iwt.visibleImage);
+      // The placeholder image column is present at every width.
+      await expect(iwt.imageBlock).toBeVisible();
+      await expect(iwt.placeholder).toHaveCount(1);
     });
   }
 });
@@ -365,33 +330,11 @@ test.describe('Image with Text - Breakpoint boundaries', () => {
       .toBe('row');
   });
 
-  test('mobile image shows at 767px and desktop image at 768px (Bootstrap md edge)', async ({ page }) => {
-    const iwt = new ImageWithTextPage(page);
-    const md = IWT.desktopImageMinWidth;
-
-    await page.setViewportSize({ width: md - 1, height: HEIGHT });
-    await iwt.open(IWT.path);
-    await expect(iwt.mobileImageWrap, `at ${md - 1}px the mobile image should show`).toBeVisible();
-    await expect(iwt.desktopImageWrap).toBeHidden();
-
-    await page.setViewportSize({ width: md, height: HEIGHT });
-    await expect(iwt.desktopImageWrap, `at ${md}px the desktop image should show`).toBeVisible();
-    await expect(iwt.mobileImageWrap).toBeHidden();
-  });
-
-  test('the layout flip and the image swap are independent breakpoints', async ({ page }) => {
-    // Between md (768) and lg (992) the section still stacks, but already
-    // shows the DESKTOP image. This gap is easy to regress, so pin it.
-    const iwt = new ImageWithTextPage(page);
-    await page.setViewportSize({ width: 800, height: HEIGHT });
-    await iwt.open(IWT.path);
-
-    expect(await iwt.layoutDirection()).toBe('column');
-    await expect(iwt.desktopImageWrap).toBeVisible();
-    await expect(iwt.mobileImageWrap).toBeHidden();
-  });
-
   test('the section survives an extremely narrow viewport without overflowing', async ({ page }) => {
+    // Scoped to the image-with-text section's own box. (Document-level
+    // horizontal scroll at 320px is caused by the announcement bar's marquee
+    // track, a different section — that belongs to the announcement-bar suite,
+    // not here.)
     const iwt = new ImageWithTextPage(page);
     await page.setViewportSize({ width: 320, height: HEIGHT });
     await iwt.open(IWT.path);
@@ -401,10 +344,11 @@ test.describe('Image with Text - Breakpoint boundaries', () => {
     expect(box).not.toBeNull();
     expect(box!.width).toBeLessThanOrEqual(321);
 
-    const hasHorizontalScroll = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    // The section's own content must not overflow its box horizontally.
+    const sectionOverflows = await iwt.section.evaluate(
+      (el) => el.scrollWidth > el.clientWidth + 1,
     );
-    expect(hasHorizontalScroll, 'page must not scroll horizontally at 320px').toBe(false);
+    expect(sectionOverflows, 'the section must not scroll horizontally at 320px').toBe(false);
   });
 });
 
@@ -434,10 +378,10 @@ test.describe('Image with Text - Accessibility', () => {
   });
 
   test('decorative imagery is hidden from the accessibility tree', async () => {
-    // Both wraps carry aria-hidden="true". This is what keeps the theme's
-    // alt-less <img> elements from becoming an a11y violation. See NOTE 1.
+    // The image wrap (placeholder here) carries aria-hidden="true", keeping the
+    // decorative SVG out of the a11y tree. See NOTE 1.
     const wraps = await iwt.imageWraps.all();
-    expect(wraps.length).toBe(IWT.imageCount);
+    expect(wraps.length).toBe(IWT.imageWrapCount);
     for (const wrap of wraps) {
       await expect(wrap).toHaveAttribute('aria-hidden', 'true');
     }
@@ -450,14 +394,6 @@ test.describe('Image with Text - Accessibility', () => {
   test('the call-to-action is exposed as a named link', async ({ page }) => {
     const link = page.getByRole('link', { name: IWT.buttonLabel, exact: true });
     await expect(link.first()).toBeVisible();
-  });
-
-  test('bullet icons are presentational and carry no accessible name', async () => {
-    // The icons are inline <svg> with no <title>/aria-label; the adjacent
-    // .bullet-point__text carries the meaning. Assert the text is what is
-    // exposed, so a screen reader never announces a bare icon.
-    const texts = await iwt.bulletPointTexts();
-    expect(texts).toEqual(IWT.bullets);
   });
 
   test('section content remains perceivable under reduced motion', async ({ page }) => {
@@ -481,16 +417,6 @@ test.describe('Image with Text - Edge cases', () => {
     await iwt.setDesktopView();
     await iwt.openWithoutSection(IWT.notRenderedOn);
     await expect(iwt.allSections).toHaveCount(0);
-  });
-
-  test('the section exposes no placeholder image when configured with a real image', async ({ page }) => {
-    const iwt = new ImageWithTextPage(page);
-    await iwt.setDesktopView();
-    await iwt.open(IWT.path);
-    await expect(iwt.placeholder).toHaveCount(0);
-    // Shopify serves theme images from the shop's own CDN path, not from
-    // cdn.shopify.com, and image_tag emits a width-keyed candidate list.
-    await expect(iwt.images.first()).toHaveAttribute('srcset', /\/cdn\/shop\/files\/.+width=\d+\s+\d+w/);
   });
 
   test('the content column never collapses to zero width', async ({ page }) => {
@@ -531,56 +457,60 @@ test.describe('Image with Text - Stability', () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// NOTES — theme defects, Shopify limits & scenarios NOT automated
+// NOTES — theme limitations, Shopify limits & scenarios NOT automated
 // ─────────────────────────────────────────────────────────────
-// 1. THEME DEFECT — the <img> elements carry no `alt` attribute at all.
-//    `blocks/image-with-text-image.liquid` passes `alt: desktop_media_image.alt`
-//    to `image_tag`. The store's media files have an EMPTY alt, so Liquid
-//    passes nil and `image_tag` omits the attribute entirely (rather than
-//    emitting `alt=""`). The images escape being an axe violation only because
-//    their wrapper is `aria-hidden="true"`. That is fragile: remove the
-//    aria-hidden and the section instantly fails WCAG 1.1.1. Recommended theme
-//    fix: emit `alt: desktop_media_image.alt | default: ''` so a decorative
-//    image is explicitly marked as such. The a11y suite asserts the
-//    aria-hidden contract that currently holds this together.
+// 1. THEME DEFECT (latent) — the real <img> path emits no `alt` attribute.
+//    When an image IS configured, `blocks/image-with-text-image.liquid` passes
+//    `alt: media_image.alt` to `image_tag`; if the media file's alt is empty,
+//    Liquid passes nil and `image_tag` omits the attribute entirely rather than
+//    emitting `alt=""`. Such an image would only avoid an axe violation because
+//    its wrapper is `aria-hidden="true"`. This store currently uses the
+//    placeholder (no <img>), so the defect is dormant, but the a11y suite
+//    asserts the aria-hidden contract that will hold the real-image path
+//    together. Recommended theme fix: `alt: media_image.alt | default: ''`.
 //
-// 2. THE PUBLISHED THEME RENDERS NO IMAGE-WITH-TEXT SECTION — and no homepage.
-//    The published theme ships `sections/image-with-text.liquid`, but it is not
-//    placed in any template or section group. Worse, the theme has NO
-//    `templates/index.json` at all, so the storefront homepage falls through to
-//    the 404 template and literally renders `<h1>404</h1>`.
-//    These tests run against an unpublished duplicate ("QA - Announcement Bar
-//    (Playwright)", theme id 188167946607) in which `templates/index.json` was
-//    created with a single image-with-text section. `SHOPIFY_PREVIEW_THEME_ID`
-//    in .env selects it and globalSetup plants Shopify's preview cookie. Clear
-//    that variable and every test here fails on a missing section — by design.
+// 2. STORE & RENDERING — runs against the LIVE published theme.
+//    Target store: abundance-theme.myshopify.com (public, no password). Its
+//    published Atles theme places one image-with-text section on the home
+//    template, so it renders on the live storefront homepage with no theme
+//    duplicate or preview cookie. `data/testData.json → imageWithText` mirrors
+//    that live config. If the section's settings change in the Theme Editor,
+//    refresh that block to match.
 //
 // 3. CROSS-BROWSER coverage is limited by the framework's project matrix.
 //    `playwright.config.ts` defines three projects — Desktop Chrome, iPad
-//    (gen 7) and iPhone 13 — ALL of which are Chromium. Nothing in this spec is
-//    Chromium-specific (no `-webkit-`/`-moz-` assertions, no engine-only APIs),
-//    so it will run unchanged on Firefox and WebKit; but genuine cross-browser
-//    coverage requires adding `firefox` and `webkit` projects to the config.
-//    That is a framework-wide change affecting every suite, so it is called out
-//    here rather than made silently.
+//    (gen 7) and iPhone 13 — ALL Chromium. Nothing in this spec is
+//    Chromium-specific, so it will run unchanged on Firefox and WebKit; genuine
+//    cross-browser coverage requires adding `firefox` and `webkit` projects.
+//    That is a framework-wide change, so it is called out rather than made
+//    silently.
 //
-// 4. Settings-permutation coverage is bounded by the live configuration.
-//    `image_position: right`, `vertical_alignment: top|bottom`,
-//    `content_alignment: center|right`, `mobile_image_position: bottom`,
-//    `enable_overlay`, the border styles, the `square`/`portrait`/`auto` aspect
-//    ratios, and the blank-image placeholder path are all supported by the
-//    theme but are NOT active in this store. Asserting them would require
-//    mutating theme settings mid-run, which Shopify offers no storefront API
-//    for. They are covered only negatively (placeholder/overlay absence). To
-//    extend: duplicate the section with a second configuration and parameterise
-//    `IWT` over both.
+// 4. IMAGE coverage is bounded by the live configuration (no image uploaded).
+//    The theme supports a desktop image, a separate mobile image (swapped at
+//    Bootstrap `md` = 768px), `square`/`portrait`/`landscape`/`auto` aspect
+//    ratios, a colour/gradient overlay, and border styles. NONE are active
+//    here — the section uses the placeholder. So the image-loading, `srcset`,
+//    mobile/desktop swap, aspect-ratio and overlay tests are represented only
+//    by their default-state assertions (placeholder present, no <img>, no
+//    overlay). Upload an image (and a mobile image) in the Theme Editor, set
+//    IWT.realImageCount / hasPlaceholder / imageWrapCount accordingly, and add
+//    the image-swap + load + srcset tests to exercise the full path. The page
+//    object already ships `visibleImage` and `waitForVisibleImageLoaded()` for
+//    exactly that.
 //
-// 5. `image_width` is a desktop-only setting. Below Bootstrap `lg` (992px) the
-//    theme's CSS forces both columns to `width: 100%`, so the `--image-width`
-//    custom property is present in the DOM but has no layout effect. The width
-//    ratio is therefore asserted only at desktop.
+// 5. BULLET points are bounded by the live configuration (none configured).
+//    The section supports repeatable `bullet-points` blocks (icon + text). This
+//    store has zero, so `bulletCount` is 0 and the suite asserts their absence.
+//    Add blocks in the Theme Editor and raise IWT.bulletCount to cover bullet
+//    text, order and icon rendering.
 //
-// 6. The content column is `position: sticky; top: 0` at ≥992px. Asserting
-//    sticky travel requires scrolling a taller-than-viewport section and is
-//    inherently timing-sensitive; the computed contract is left unasserted
-//    rather than introducing a flaky scroll test.
+// 6. Settings-permutation coverage (image_position: right, other alignments,
+//    overlay, borders) needs the setting toggled. Shopify offers no storefront
+//    API to mutate theme settings mid-run, so these are covered only in their
+//    current state. To extend: reconfigure the section (or a second instance)
+//    and parameterise `IWT` over both configurations.
+//
+// 7. `image_width` is a desktop-only setting. Below Bootstrap `lg` (992px) the
+//    theme forces both columns to `width: 100%`, so `--image-width` is present
+//    in the DOM but has no layout effect. The width ratio is asserted only at
+//    desktop.

@@ -1,21 +1,22 @@
 // tests/announcement-bar.spec.ts
 // ─────────────────────────────────────────────────────────────
-// Announcement Bar test suite for the CURRENT published Shopify theme
-// "theme-export-wdt-atles-myshopify-com-kajalsele" (a Selena / SHThemes
-// build) on wdtsanthanalakshmi.myshopify.com.
+// Announcement Bar test suite for the published Shopify theme
+// "theme-export-wdt-atles-myshopify-com-kajalsele" (a Selena / SHThemes build)
+// on abundance-theme.myshopify.com (public, no password protection).
 //
 // Coverage was derived by inspecting the theme source through the Shopify
 // MCP server AND dumping the live rendered storefront DOM/CSS. Verified:
-//   • The section lives in `header-group`, so it renders above the
-//     <site-header> on every template and survives navigation. Dynamic id
+//   • The section lives in `header-group`, so it renders in the header region
+//     (above <main>) on every template and survives navigation. On this store
+//     it is ordered just BELOW the <site-header> within the group. Dynamic id
 //     (#shopify-section-sections--…__announcement_bar) → never hard-coded;
 //     scoped via `.announcement-bar` / `.shopify-section--announcement-bar`.
 //   • Marquee mode (`data-type="marquee"`): `.announcement-bar__marquee-track`
 //       animation: announcement-bar-marquee 30s linear infinite normal;
 //     pauses on hover, gated by `[data-pause-hover="true"]`.
-//   • Exactly ONE `.announcement-bar__marquee-group` holding 3
-//     `.announcement-bar-item` blocks. Item 2 carries a link to
-//     /collections/all; the other two are plain text.
+//   • Exactly ONE `.announcement-bar__marquee-group` holding 4
+//     `.announcement-bar-item` blocks, each reading "Free shipping on orders
+//     over $50". No item is linked, and the bottom divider is off.
 //   • Carousel (Swiper) mode, social icons, localization slot, edge fade and
 //     any dismiss control are all absent in this config.
 //
@@ -57,23 +58,31 @@ test.describe('Announcement Bar - Structure & Presence', () => {
     await expect(ab.content).toBeVisible();
   });
 
-  test('announcement bar is positioned above the site header', async () => {
+  test('announcement bar renders above the main page content', async () => {
+    // The bar is a header-group section, so it sits above <main> regardless of
+    // whether it is ordered above or below the header within the group (this
+    // store orders it just below the header). Comparing against the header
+    // directly would be store-order-specific; comparing against main is not.
     const barBox = await ab.section.boundingBox();
-    const headerBox = await ab.siteHeader.boundingBox();
+    const mainBox = await ab.siteMain.boundingBox();
     expect(barBox, 'announcement bar should have a layout box').not.toBeNull();
-    expect(headerBox, 'site header should have a layout box').not.toBeNull();
-    // The bar's top edge must sit above the header's top edge.
-    expect(barBox!.y).toBeLessThan(headerBox!.y);
+    expect(mainBox, 'main content should have a layout box').not.toBeNull();
+    // The bar's bottom edge must sit at or above the main content's top edge.
+    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(mainBox!.y + 1);
   });
 
   test('announcement bar applies the configured theme color scheme', async () => {
     await expect(ab.section).toHaveClass(new RegExp(AB.colorSchemeClass));
   });
 
-  test('announcement bar renders the configured bottom divider', async () => {
-    // `show_bottom_divider: true` in the section settings adds this modifier.
-    expect(AB.showsBottomDivider).toBe(true);
-    await expect(ab.section).toHaveClass(/announcement-bar--divider/);
+  test('announcement bar reflects the configured bottom-divider setting', async () => {
+    // `show_bottom_divider` adds the `--divider` modifier class. This store
+    // has it OFF, so the class must be absent. Flip AB.showsBottomDivider in
+    // testData if the setting is turned on.
+    const hasDivider = await ab.section.evaluate((el) =>
+      el.classList.contains('announcement-bar--divider'),
+    );
+    expect(hasDivider).toBe(AB.showsBottomDivider);
   });
 });
 
@@ -107,30 +116,19 @@ test.describe('Announcement Bar - Content & Validation', () => {
   });
 
   test('announcement item content matches the configured text, in order', async () => {
-    // messages() reads textContent, so the CSS `text-transform: uppercase`
-    // does not leak in — these are the strings authored in theme settings.
+    // messages() reads textContent, so any CSS `text-transform` does not leak
+    // in — these are the strings authored in theme settings.
     expect(await ab.messages()).toEqual(AB.messages);
   });
 
-  test('the linked announcement item points at its configured destination', async () => {
-    await expect(ab.itemLinks).toHaveCount(AB.linkCount);
-    expect(await ab.linkHrefs()).toEqual([AB.linkHref]);
-    await expect(ab.itemLinks.first()).toHaveText(AB.linkedMessage);
-  });
-
-  test('the linked announcement item navigates when clicked', async ({ page }) => {
-    // clickLinkedItem() hovers first: the marquee animates continuously, so the
-    // anchor is never "stable" for Playwright's actionability check until the
-    // theme's pause-on-hover kicks in. See NOTE 7.
-    await ab.clickLinkedItem();
-    await page.waitForURL(new RegExp(`${AB.linkHref}$`));
-    expect(new URL(page.url()).pathname).toBe(AB.linkHref);
-  });
-
-  test('unlinked announcement items are plain text, not anchors', async () => {
-    // Only one of the three items was given a link in theme settings.
-    expect(await ab.items.count()).toBe(AB.itemCount);
-    expect(await ab.itemLinks.count()).toBe(AB.linkCount);
+  test('announcement items are plain text — no links configured', async () => {
+    // In this store's config none of the announcement items carry a link, so
+    // the bar renders no anchors. (See NOTE 5 — the theme DOES support a
+    // per-item link; this suite covers the linked path negatively until one
+    // is configured.)
+    expect(AB.linkCount).toBe(0);
+    await expect(ab.itemLinks).toHaveCount(0);
+    await expect(ab.items).toHaveCount(AB.itemCount);
   });
 });
 
@@ -139,8 +137,8 @@ test.describe('Announcement Bar - Content & Validation', () => {
 // ─────────────────────────────────────────────────────────────
 // This block exists ONLY to demonstrate a failing test in the report.
 // It is deliberately self-contained and store-independent so it fails
-// deterministically on every run, everywhere. The expected count is
-// AB.itemCount (3); the assertion asks for one more on purpose.
+// deterministically on every run, everywhere. It asserts one more item than
+// the bar actually renders (AB.itemCount + 1), on purpose.
 // To restore a fully-green suite, delete this entire describe block.
 // ═════════════════════════════════════════════════════════════
 test.describe('Announcement Bar - DEMO (intentional failure)', () => {
@@ -149,8 +147,8 @@ test.describe('Announcement Bar - DEMO (intentional failure)', () => {
     await ab.setDesktopView();
     await ab.open();
 
-    // The bar renders AB.itemCount (3) items; asserting itemCount + 1 forces
-    // a clear, readable failure: "expected 4, received 3".
+    // The bar renders AB.itemCount items; asserting itemCount + 1 forces
+    // a clear, readable failure (e.g. "expected 5, received 4").
     await expect(ab.items).toHaveCount(AB.itemCount + 1);
   });
 });
@@ -263,7 +261,9 @@ test.describe('Announcement Bar - UI & Layout', () => {
   });
 
   test('announcement text renders in the configured letter case', async () => {
-    // `text_transform: uppercase` on every announcement-item block.
+    // `text_transform` on the announcement-item block. This store leaves it at
+    // the default (rte), so the computed value is `none`. Update
+    // AB.textTransform if the setting is changed.
     expect(await ab.itemTextTransform()).toBe(AB.textTransform);
   });
 
@@ -291,7 +291,7 @@ test.describe('Announcement Bar - UI & Layout', () => {
 // ═════════════════════════════════════════════════════════════
 test.describe('Announcement Bar - Responsive', () => {
   for (const bp of BREAKPOINTS) {
-    test(`bar stays visible above the header and animates at ${bp.name} (${bp.width}px)`, async ({ page }) => {
+    test(`bar stays visible above the main content and animates at ${bp.name} (${bp.width}px)`, async ({ page }) => {
       const ab = new AnnouncementBarPage(page);
       await page.setViewportSize({ width: bp.width, height: bp.height });
       await ab.open();
@@ -302,8 +302,8 @@ test.describe('Announcement Bar - Responsive', () => {
       await expect(ab.items).toHaveCount(AB.itemCount);
 
       const barBox = await ab.section.boundingBox();
-      const headerBox = await ab.siteHeader.boundingBox();
-      expect(barBox!.y).toBeLessThan(headerBox!.y);
+      const mainBox = await ab.siteMain.boundingBox();
+      expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(mainBox!.y + 1);
 
       // The marquee animation is offered at every width.
       expect(await ab.animationName()).toContain(AB.animationName);
@@ -340,8 +340,11 @@ test.describe('Announcement Bar - Accessibility', () => {
     ).toEqual([]);
   });
 
-  test('the linked announcement item is reachable as a link', async () => {
-    await expect(ab.itemLinks.first()).toHaveAttribute('href', AB.linkHref);
+  test('announcement messages are exposed as readable text', async () => {
+    // No item is linked in this config, so there is no interactive element to
+    // expose — the requirement is simply that the message text is perceivable.
+    await expect(ab.itemTexts.first()).toBeVisible();
+    expect((await ab.messages())[0]).toBe(AB.messages[0]);
   });
 
   test('announcement text remains perceivable when reduced motion is preferred', async ({ page }) => {
@@ -435,33 +438,30 @@ test.describe('Announcement Bar - Stability', () => {
 //    The animation therefore keeps running. Rather than assert a theme
 //    limitation as a pass, the a11y suite verifies the message text stays
 //    perceivable; stopping the animation is a recommended theme improvement.
-// 3. THE PUBLISHED THEME RENDERS NO ANNOUNCEMENT BAR.
-//    The store publishes "theme-export-wdt-atles-myshopify-com-kajalsele".
-//    Its `sections/announcement-bar.liquid` ships with the theme but is NOT
-//    placed in any section group or template, so no announcement bar renders
-//    on the live storefront at all. These tests run against an unpublished
-//    duplicate ("QA - Announcement Bar (Playwright)", id 188167946607) that
-//    adds the section to `sections/header-group.json` in marquee mode.
-//    `SHOPIFY_PREVIEW_THEME_ID` in .env selects it; globalSetup plants
-//    Shopify's preview cookie. Clear that var to test the published theme,
-//    at which point every test here will fail on a missing bar — by design.
+// 3. STORE & RENDERING — runs against the LIVE published theme.
+//    Target store: abundance-theme.myshopify.com (public, no password). Its
+//    published Atles theme places the announcement bar in
+//    `sections/header-group.json` in marquee mode, so the bar renders on every
+//    page of the live storefront — no theme duplicate or preview cookie needed.
+//    `data/testData.json → announcementBar` mirrors that live config (4 items,
+//    no links, no divider, default letter case). If the section's settings are
+//    changed in the Theme Editor, refresh that block to match.
 // 4. The "above the header" check resolves `<site-header>` from this suite's
 //    own locator module. There is no HeaderPage for this theme yet; when one is
 //    written, move the `siteHeader` selector into its own header locator file.
-// 5. Carousel (Swiper) mode: the section supports `type: carousel` with
+// 5. PER-ITEM LINK path is covered only negatively in this config.
+//    The theme supports a `link` per announcement item; this store configures
+//    none, so the suite asserts zero anchors. When a link IS configured,
+//    AnnouncementBarPage.clickLinkedItem() is ready to exercise it: the marquee
+//    never stops, so a plain .click() reports "element is not stable" and times
+//    out; clickLinkedItem() hovers first (the theme's pause-on-hover settles the
+//    anchor) on hover-capable pointers, and forces the click on touch — mirroring
+//    how a user taps a moving target. Add href/navigation tests once a link exists.
+// 6. Carousel (Swiper) mode: the section supports `type: carousel` with
 //    autoplay, loop, pause-on-hover and prev/next arrows. This store runs
 //    marquee mode, so the carousel path is covered only negatively. If the
 //    setting is switched, extend the Marquee suite with slide/arrow coverage.
-// 6. Marquee pixel travel: asserting the strip actually translates over time is
+// 7. Marquee pixel travel: asserting the strip actually translates over time is
 //    timing/CI-flaky, so behaviour is validated via the computed animation
 //    contract (name/duration/direction/iteration/play-state) and the
 //    deterministic pause-on-hover interaction instead.
-// 7. USABILITY — links inside the marquee are hard to click.
-//    The strip never stops moving, so Playwright's actionability check reports
-//    "element is not stable" and a plain .click() on an announcement link times
-//    out. AnnouncementBarPage.clickLinkedItem() hovers first, letting the
-//    theme's pause-on-hover settle the anchor before clicking — which is
-//    exactly what a mouse user does. Touch pointers get no hover and therefore
-//    no pause, so the method falls back to a forced click to mimic tapping a
-//    moving target. That fallback documents a genuine mobile UX weakness of
-//    marquee-mode links, not a test shortcut.

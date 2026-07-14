@@ -63,11 +63,16 @@ export const announcementBarSelectors = {
   // The bar is persistent — the theme renders no dismiss/close affordance.
   closeButton:    '.announcement-bar [class*="close"], .announcement-bar button[aria-label*="close" i], .announcement-bar button[aria-label*="dismiss" i]',
 
-  // ── Neighbouring region ───────────────────────────────────
-  // This theme's header is a <site-header> custom element. Used by the
-  // "bar sits above the header" check. When a dedicated HeaderPage is written
-  // for this theme, move this selector into its own header locator module.
+  // ── Neighbouring regions ──────────────────────────────────
+  // This theme's header is a <site-header> custom element. When a dedicated
+  // HeaderPage is written for this theme, move this selector into its own
+  // header locator module.
   siteHeader:     'site-header',
+  // The theme's main content wrapper (layout/theme.liquid). The announcement
+  // bar belongs to the header group, so it always renders ABOVE this — a
+  // store-agnostic placement check that holds whether the bar is ordered above
+  // or below the header within the group.
+  siteMain:       '#MainContent',
 
   // ── Hooks the theme's own marquee.js looks for ─────────────
   // assets/marquee.js queries .marquee-content / .marquee-track / .marquee-group,

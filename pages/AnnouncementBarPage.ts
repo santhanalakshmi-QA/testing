@@ -100,6 +100,10 @@ export class AnnouncementBarPage extends BasePage {
   get siteHeader(): Locator {
     return this.page.locator(S.siteHeader).first();
   }
+  /** The theme's main content wrapper — the bar always renders above it. */
+  get siteMain(): Locator {
+    return this.page.locator(S.siteMain).first();
+  }
 
   /** Elements the theme's own `marquee.js` looks for (it finds none here). */
   get jsMarqueeHooks(): Locator {
