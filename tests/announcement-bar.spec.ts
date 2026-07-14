@@ -135,6 +135,27 @@ test.describe('Announcement Bar - Content & Validation', () => {
 });
 
 // ═════════════════════════════════════════════════════════════
+// ⚠ DEMO — INTENTIONALLY FAILING TEST (remove after the demo)
+// ─────────────────────────────────────────────────────────────
+// This block exists ONLY to demonstrate a failing test in the report.
+// It is deliberately self-contained and store-independent so it fails
+// deterministically on every run, everywhere. The expected count is
+// AB.itemCount (3); the assertion asks for one more on purpose.
+// To restore a fully-green suite, delete this entire describe block.
+// ═════════════════════════════════════════════════════════════
+test.describe('Announcement Bar - DEMO (intentional failure)', () => {
+  test('DEMO: announcement item count is deliberately wrong (expected to fail)', async ({ page }) => {
+    const ab = new AnnouncementBarPage(page);
+    await ab.setDesktopView();
+    await ab.open();
+
+    // The bar renders AB.itemCount (3) items; asserting itemCount + 1 forces
+    // a clear, readable failure: "expected 4, received 3".
+    await expect(ab.items).toHaveCount(AB.itemCount + 1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════
 // 3. MARQUEE BEHAVIOUR  (functional)
 // ═════════════════════════════════════════════════════════════
 test.describe('Announcement Bar - Marquee behaviour', () => {
